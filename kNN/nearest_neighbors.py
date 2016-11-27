@@ -42,7 +42,7 @@ class KNN_classifier(object):
         self.strategy = self._check_strategy(strategy)
         self.metric = self._check_metric(metric)
         self.weights = weights
-        self.test_block_size = self._check_block_size(test_block_size)
+        self.test_block_size = test_block_size
         self.eps = eps
         if strategy == 'my_own':
             self.alg = MyOwnKNN_classifier(
@@ -107,20 +107,23 @@ class KNN_classifier(object):
            Will use size of block passed to the constructor"""
 
         X = self._check_array(X)
+        size = self._check_block_size(
+            self.test_block_size, X.shape[0])
 
         k = self.k
         dist = np.empty((0, k))
         ind = np.empty((0, k), dtype=int)
-        size = self.test_block_size
         n_samples = X.shape[0]
+        n = int(n_samples / size)
 
-        for idx in range(int(n_samples / size)):
+        for idx in range(n):
             neigh_dst, neigh_ind = self.alg.kneighbors(
                 X[idx * size:(idx + 1) * size])
             dist = np.vstack((dist, neigh_dst))
             ind = np.vstack((ind, neigh_ind))
 
         if n_samples % size != 0:
+            idx = n - 1
             neigh_dst, neigh_ind = self.alg.kneighbors(X[(idx + 1) * size:])
             dist = np.vstack((dist, neigh_dst))
             ind = np.vstack((ind, neigh_ind))
@@ -164,7 +167,7 @@ class KNN_classifier(object):
             Class labels for each data sample.
         """
         if self.weights:
-            return self.weighted_predict(X)
+            return self.weighted_predict(X, neigh_dist, neigh_ind)
 
         X = self._check_array(X, atleast_2d=True)
 
@@ -188,7 +191,7 @@ class KNN_classifier(object):
         """
 
         X = self._check_array(X, atleast_2d=True)
-
+        
         if neigh_dist is None:
             neigh_dist, neigh_ind = self.find_kneighbors(X)
 
@@ -228,12 +231,12 @@ class KNN_classifier(object):
             raise ValueError(
                 "metric not recognized: should be 'euclidean' or 'cosine'")
 
-    def _check_block_size(self, test_block_size):
+    def _check_block_size(self, test_block_size, N):
         """Check to make sure test_block_size is greater than zero"""
-        if test_block_size > 0:
+        if test_block_size > 0 and test_block_size <= N:
             return test_block_size
         else:
-            raise ValueError("test_block_size should be greater than zero")
+            raise ValueError("test_block_size should be in range (0, {}]".format(N))
 
     def _check_array(self, array, atleast_2d=False):
         """Input validation on an array, list, sparse matrix
